@@ -135,7 +135,8 @@ function FotoBtn({
 }
 
 export default function App() {
-  const [tela, setTela] = useState('prog');
+  const [tela, setTela] = useState('motorista');
+  const [senhaOk, setSenhaOk] = useState(false);
   const [ordens, setOrdens] = useState<any[]>([]);
   const [form, setForm] = useState({
     placa: '',
@@ -167,54 +168,22 @@ export default function App() {
   }
 
   function exportarCSV() {
-    const cabecalho = [
-      'Placa',
-      'Motorista',
-      'Fornecedor',
-      'Local',
-      'Endereço',
-      'Operação',
-      'Tipo Veículo',
-      'Nº Caçamba',
-      'Tipo Caçamba',
-      'Hora Prevista',
-      'Status',
-      'Saída',
-      'Check-in',
-      'Retorno',
-      'Observação',
-    ];
+    const cabecalho = ['Placa','Motorista','Fornecedor','Local','Endereço','Operação','Tipo Veículo','Nº Caçamba','Tipo Caçamba','Hora Prevista','Status','Saída','Check-in','Retorno','Observação'];
     const linhas = ordens.map((o: any) => [
-      o.placa,
-      o.motorista,
-      o.fornecedor,
-      o.local,
-      o.endereco || '—',
-      o.operacao,
-      o.tipo,
-      o.num_cacamba || '—',
-      o.tipo_cacamba,
-      o.hora_prevista || '—',
-      o.status,
+      o.placa, o.motorista, o.fornecedor, o.local, o.endereco || '—',
+      o.operacao, o.tipo, o.num_cacamba || '—', o.tipo_cacamba,
+      o.hora_prevista || '—', o.status,
       o.hora_saida ? formatHora(o.hora_saida) : '—',
       o.hora_checkin ? formatHora(o.hora_checkin) : '—',
       o.hora_retorno ? formatHora(o.hora_retorno) : '—',
       o.observacao || '',
     ]);
-    const csv = [cabecalho, ...linhas]
-      .map((r) =>
-        r.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(';')
-      )
-      .join('\n');
-    const blob = new Blob(['\uFEFF' + csv], {
-      type: 'text/csv;charset=utf-8;',
-    });
+    const csv = [cabecalho, ...linhas].map(r => r.map((v: any) => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ordens_${new Date()
-      .toLocaleDateString('pt-BR')
-      .replace(/\//g, '-')}.csv`;
+    a.download = `ordens_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -307,23 +276,59 @@ export default function App() {
           </div>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
-        {(['prog', 'painel', 'motorista'] as const).map((t) => (
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', alignItems: 'center' }}>
+        <button
+          onClick={() => setTela('motorista')}
+          style={{
+            ...btn(tela === 'motorista' ? '#D85A30' : '#f5f5f5'),
+            color: tela === 'motorista' ? '#fff' : '#444',
+          }}
+        >
+          🚛 App Motorista
+        </button>
+        {!senhaOk ? (
           <button
-            key={t}
-            onClick={() => setTela(t)}
-            style={{
-              ...btn(tela === t ? '#D85A30' : '#f5f5f5'),
-              color: tela === t ? '#fff' : '#444',
+            onClick={() => {
+              const s = prompt('Senha do gestor:');
+              if (s === '1234') {
+                setSenhaOk(true);
+                setTela('prog');
+              } else if (s !== null) {
+                alert('Senha incorreta!');
+              }
             }}
+            style={{ ...btn('#f5f5f5'), color: '#444' }}
           >
-            {t === 'prog'
-              ? '📋 Programação'
-              : t === 'painel'
-              ? '📊 Painel ao vivo'
-              : '🚛 App Motorista'}
+            🔒 Gestor
           </button>
-        ))}
+        ) : (
+          <>
+            <button
+              onClick={() => setTela('prog')}
+              style={{
+                ...btn(tela === 'prog' ? '#D85A30' : '#f5f5f5'),
+                color: tela === 'prog' ? '#fff' : '#444',
+              }}
+            >
+              📋 Programação
+            </button>
+            <button
+              onClick={() => setTela('painel')}
+              style={{
+                ...btn(tela === 'painel' ? '#D85A30' : '#f5f5f5'),
+                color: tela === 'painel' ? '#fff' : '#444',
+              }}
+            >
+              📊 Painel ao vivo
+            </button>
+            <button
+              onClick={() => { setSenhaOk(false); setTela('motorista'); }}
+              style={{ ...btn('#aaa') }}
+            >
+              🔓 Sair
+            </button>
+          </>
+        )}
       </div>
 
       {tela === 'prog' && (
@@ -337,7 +342,9 @@ export default function App() {
             }}
           >
             <div style={{ fontWeight: 500 }}>
-              Programação — {new Date().toLocaleDateString('pt-BR', {})}
+              Programação —{' '}
+              {new Date().toLocaleDateString('pt-BR', {
+              })}
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
               <button style={btn('#1a7a3c')} onClick={exportarCSV}>
@@ -417,15 +424,7 @@ export default function App() {
                     value={form.tipo}
                     onChange={(e) => setForm({ ...form, tipo: e.target.value })}
                   >
-                    {[
-                      'Caminhão comum',
-                      'ROLLON',
-                      'POLY/DUPLO',
-                      'MUNCK',
-                      'MUNCK + TROCA',
-                      'JULIETA',
-                      'POLLY DUPLO',
-                    ].map((o) => (
+                    {['Caminhão comum', 'ROLLON', 'POLY/DUPLO', 'MUNCK', 'MUNCK + TROCA', 'JULIETA', 'POLLY DUPLO'].map((o) => (
                       <option key={o}>{o}</option>
                     ))}
                   </select>
@@ -444,9 +443,7 @@ export default function App() {
                       setForm({
                         ...form,
                         fornecedor: nome,
-                        endereco: encontrado
-                          ? encontrado.endereco
-                          : form.endereco,
+                        endereco: encontrado ? encontrado.endereco : form.endereco,
                       });
                     }}
                     placeholder="GRIMALDI"
@@ -906,9 +903,7 @@ export default function App() {
               <div style={{ marginBottom: '10px' }}>
                 {o.endereco ? (
                   <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                      o.endereco
-                    )}`}
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(o.endereco)}`}
                     target="_blank"
                     rel="noreferrer"
                     style={{
