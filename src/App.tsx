@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './supabase';
+// v2
 
 const TIPO_BADGE: any = {
   Retira: '#993C1D',
