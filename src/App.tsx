@@ -137,6 +137,7 @@ function FotoBtn({
 export default function App() {
   const [tela, setTela] = useState('motorista');
   const [senhaOk, setSenhaOk] = useState(false);
+  const [filtroDt, setFiltroDt] = useState(() => new Date().toISOString().slice(0, 10));
   const [ordens, setOrdens] = useState<any[]>([]);
   const [form, setForm] = useState({
     placa: '',
@@ -320,6 +321,15 @@ export default function App() {
               }}
             >
               📊 Painel ao vivo
+            </button>
+            <button
+              onClick={() => setTela('rastreamento')}
+              style={{
+                ...btn(tela === 'rastreamento' ? '#D85A30' : '#f5f5f5'),
+                color: tela === 'rastreamento' ? '#fff' : '#444',
+              }}
+            >
+              📍 Rastreamento
             </button>
             <button
               onClick={() => { setSenhaOk(false); setTela('motorista'); }}
@@ -1014,14 +1024,28 @@ export default function App() {
                   />
                   <button
                     style={{ ...btn('#0F6E56'), width: '100%' }}
-                    onClick={() =>
-                      atualizarStatus(o.id, {
-                        status: 'check-in',
-                        hora_checkin: new Date().toISOString(),
-                        foto_fachada: true,
-                        url_foto_fachada: fotos[o.id + '_fachada'] || null,
-                      })
-                    }
+                    onClick={() => {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => {
+                          atualizarStatus(o.id, {
+                            status: 'check-in',
+                            hora_checkin: new Date().toISOString(),
+                            foto_fachada: true,
+                            url_foto_fachada: fotos[o.id + '_fachada'] || null,
+                            lat: pos.coords.latitude,
+                            lng: pos.coords.longitude,
+                          });
+                        },
+                        () => {
+                          atualizarStatus(o.id, {
+                            status: 'check-in',
+                            hora_checkin: new Date().toISOString(),
+                            foto_fachada: true,
+                            url_foto_fachada: fotos[o.id + '_fachada'] || null,
+                          });
+                        }
+                      );
+                    }}
                   >
                     ✅ Check-in no fornecedor
                   </button>
@@ -1029,6 +1053,26 @@ export default function App() {
               )}
               {o.hora_checkin && !o.hora_checkout && (
                 <div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <label style={{ fontSize: '11px', color: '#666', display: 'block', marginBottom: '4px' }}>
+                      Nº caçamba que está retornando
+                    </label>
+                    <input
+                      style={{
+                        width: '100%',
+                        padding: '8px 10px',
+                        fontSize: '13px',
+                        border: '1px solid #ddd',
+                        borderRadius: '6px',
+                        boxSizing: 'border-box' as const,
+                      }}
+                      placeholder="Ex: 49"
+                      value={fotos[o.id + '_cacamba_retorno'] || ''}
+                      onChange={(e) =>
+                        setFotos((f: any) => ({ ...f, [o.id + '_cacamba_retorno']: e.target.value }))
+                      }
+                    />
+                  </div>
                   <FotoBtn
                     label="Foto da caçamba (retorno)"
                     onFoto={(url) =>
@@ -1043,6 +1087,7 @@ export default function App() {
                         hora_checkout: new Date().toISOString(),
                         foto_volta: true,
                         url_foto_volta: fotos[o.id + '_volta'] || null,
+                        num_cacamba_retorno: fotos[o.id + '_cacamba_retorno'] || null,
                       })
                     }
                   >
@@ -1107,6 +1152,114 @@ export default function App() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {tela === 'rastreamento' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '1rem', flexWrap: 'wrap' as const }}>
+            <div style={{ fontWeight: 500 }}>📍 Rastreamento de Caçambas</div>
+            <input
+              type="date"
+              value={filtroDt}
+              onChange={(e) => setFiltroDt(e.target.value)}
+              style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ddd', fontSize: '13px' }}
+            />
+          </div>
+
+          {/* LINKS DO MAPS */}
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: '8px', marginBottom: '1rem' }}>
+            {ordens
+              .filter((o: any) => o.lat && o.lng && o.hora_checkin && !o.hora_retorno)
+              .map((o: any) => (
+                <a
+                  key={o.id}
+                  href={`https://www.google.com/maps?q=${o.lat},${o.lng}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    background: '#f0f7ff',
+                    border: '1px solid #b3d4f5',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    fontSize: '12px',
+                    color: '#1a6fbd',
+                    textDecoration: 'none',
+                  }}
+                >
+                  📍 Caç. #{o.num_cacamba} — {o.fornecedor}
+                </a>
+              ))}
+            {ordens.filter((o: any) => o.lat && o.lng && o.hora_checkin && !o.hora_retorno).length === 0 && (
+              <div style={{ fontSize: '12px', color: '#aaa' }}>Nenhuma caçamba com localização GPS registrada ainda.</div>
+            )}
+          </div>
+
+          {/* RELATÓRIO */}
+          <div style={{ fontWeight: 500, marginBottom: '8px', fontSize: '13px', color: '#666' }}>
+            Caçambas — {new Date(filtroDt + 'T12:00:00').toLocaleDateString('pt-BR')}
+          </div>
+          {ordens
+            .filter((o: any) => {
+              const dt = o.hora_checkin ? o.hora_checkin.slice(0, 10) : o.criado_em?.slice(0, 10);
+              return dt === filtroDt && o.num_cacamba;
+            })
+            .map((o: any) => {
+              const checkinDt = o.hora_checkin ? new Date(o.hora_checkin) : null;
+              const agora = new Date();
+              const diffH = checkinDt ? Math.floor((agora.getTime() - checkinDt.getTime()) / 3600000) : null;
+              const emCampo = o.hora_checkin && !o.hora_retorno;
+              return (
+                <div
+                  key={o.id}
+                  style={{
+                    background: '#fff',
+                    border: `1px solid ${emCampo ? '#F0997B' : '#e5e5e5'}`,
+                    borderLeft: `4px solid ${emCampo ? '#D85A30' : '#1a7a3c'}`,
+                    borderRadius: '10px',
+                    padding: '12px',
+                    marginBottom: '8px',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr 1fr 1fr',
+                    gap: '8px',
+                    alignItems: 'center',
+                    fontSize: '13px',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: '10px', color: '#aaa' }}>Caçamba deixada</div>
+                    <div style={{ fontWeight: 600, fontSize: '15px', color: '#D85A30' }}>#{o.num_cacamba || '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10px', color: '#aaa' }}>Caçamba retornada</div>
+                    <div style={{ fontWeight: 600, fontSize: '15px', color: '#1a7a3c' }}>#{o.num_cacamba_retorno || '—'}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10px', color: '#aaa' }}>Fornecedor</div>
+                    <div style={{ fontWeight: 500 }}>{o.fornecedor}</div>
+                    <div style={{ fontSize: '11px', color: '#888' }}>{o.local}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '10px', color: '#aaa' }}>Motorista</div>
+                    <div style={{ fontWeight: 500 }}>{o.motorista}</div>
+                    <div style={{ fontSize: '11px', color: emCampo ? '#D85A30' : '#1a7a3c' }}>
+                      {emCampo ? `🕐 ${diffH}h em campo` : '✅ Retornou'}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          {ordens.filter((o: any) => {
+            const dt = o.hora_checkin ? o.hora_checkin.slice(0, 10) : o.criado_em?.slice(0, 10);
+            return dt === filtroDt && o.num_cacamba;
+          }).length === 0 && (
+            <div style={{ textAlign: 'center', color: '#aaa', padding: '2rem' }}>
+              Nenhuma caçamba registrada nesta data.
+            </div>
+          )}
         </div>
       )}
     </div>
